@@ -25,10 +25,17 @@ resource "aws_iam_role" "github_oidc" {
   assume_role_policy = data.aws_iam_policy_document.github_trust.json
 }
 
-resource "aws_iam_role_policy_attachment" "s3_full" {
+# 1. Attach the ECR PowerUser policy so GitHub Actions can push to ECR/ECS
+resource "aws_iam_role_policy_attachment" "ecr_power_user" {
   role       = aws_iam_role.github_oidc.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser"
 }
+
+# 2. REMOVE OR COMMENT OUT the old S3 block below to safely detach it from the role:
+# resource "aws_iam_role_policy_attachment" "s3_full" {
+#   role       = aws_iam_role.github_oidc.name
+#   policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+# }
 
 variable "github_repository_username" {
   description = "GitHub repository username"

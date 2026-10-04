@@ -1,0 +1,53 @@
+name: Build and Push Docker Image to ECR
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  ECR_REPOSITORY: 3.4-ecr
+
+jobs:
+  build-and-push:
+    name: Build and Push Image
+    runs-on: ubuntu-latest
+    
+    # 1. REQUIRED FOR OIDC & V7 TOKEN ISOLATION
+    permissions:
+      id-token: write    # Grants permission to request the AWS OIDC JWT token
+      contents: read     # Grants permission to check out the repository code
+
+    steps:
+      # 2. V7 COMPLIANT CHECKOUT
+      - name: Checkout Source Code
+        uses: actions/checkout@v7
+        with:
+          # If you ever run this on pull requests from forks, v7 will block them by default.
+          # Leave this configuration clean for maximum workspace security.
+          persist-credentials: false 
+
+      # 3. CONFIGURE AWS CREDENTIALS VIA OIDC
+      - name: Configure AWS Credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.OIDC_ROLE }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      # 4. LOG IN TO AMAZON ECR
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # 5. BUILD, TAG, AND PUSH DOCKER IMAGE
+      - name: Build, Tag, and Push Image to Amazon ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
